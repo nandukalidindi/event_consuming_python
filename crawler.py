@@ -48,47 +48,56 @@ def crawl_page_events(handle):
         paginated_response = get_api_response(url)['data']
         for event in paginated_response:
             enriched_event = enrich_event(event["id"], handle)
-            persist_event(stringify_schema(enriched_event))
-        url = full_response['paging']['next']
+            persist_event(enriched_event, stringify_schema(enriched_event))
+        url = full_response.get('paging').get('next')
 
 def enrich_event(event_id, handle):
-    event_url = FACEBOOK_GRAPH_API + event_id + "?access_token=" + access_token + "&fields=attending_count,can_guests_invite,category,declined_count,end_time,guest_list_enabled,interested_count,is_canceled,is_page_owned,is_viewer_admin,maybe_count,name,noreply_count,parent_group,place,start_time,ticket_uri,timezone,type,updated_time&debug=all&format=json&method=get&pretty=0&suppress_http_code=1"
+    event_url = FACEBOOK_GRAPH_API + event_id + "?access_token=" + access_token + "&fields=attending_count,can_guests_invite,category,declined_count,end_time,guest_list_enabled,interested_count,is_canceled,is_page_owned,is_viewer_admin,maybe_count,name,noreply_count,parent_group,place,start_time,timezone,type,updated_time&debug=all&format=json&method=get&pretty=0&suppress_http_code=1"
     response = get_api_response(event_url)
 
-    # print(response)
+
     response['fid'] = response['id']
     response['handle'] = handle
     response['geometry'] = None
     response['venue_capacity'] = None
-
-    if response['place'] != None:
+    print(response)
+    if response.get('place') != None:
         place = response['place']
         response['venue_fid'] = place['id']
         response['venue_name'] = place['name']
-        if place['location'] != None:
+        if place.get('location') != None:
             location = place['location']
             response['venue_city'] = location['city']
             response['venue_state'] = location['state']
             response['venue_country'] = location['country']
             response['venue_latitude'] = location['latitude']
             response['venue_longitude'] = location['longitude']
+        del response['place']
 
     del response['id']
-    del response['place']
-    del response['ticket_uri']
     del response['__debug__']
 
     return response
 
-def persist_event(stringified_event):
+def persist_event(event, stringified_event):
     cursor = pg_connection.cursor()
-    sql = "INSERT INTO events (" + stringified_event[0] + ") VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"
-    values = tuple(stringified_event[1])
-    print(sql)
-    print("-----------")
-    print(values)
-    print("|||||||||||||||||||||||||||||||||||")
+
+    sql = "SELECT COUNT(*) FROM events WHERE name=%s AND venue_fid=%s AND start_time=%s"
+    values = [event.get('name'), event.get('venue_fid'), event.get('start_time')]
     cursor.execute(sql, values)
+
+    count = cursor.fetchone()[0]
+
+    if count == 0:
+        formatter_list = []
+        for i in range(0, len(stringified_event[1])):
+            formatter_list.append('%s')
+
+        formatter_list_string = ','.join(formatter_list)
+        sql = "INSERT INTO events (" + stringified_event[0] + ") VALUES (" + formatter_list_string + ")"
+        values = stringified_event[1]
+        cursor.execute(sql, values)
+        pg_connection.commit()
 
 def stringify_schema(response_dict):
     stringified_value = []
@@ -98,13 +107,6 @@ def stringify_schema(response_dict):
         if v != None:
             column_string = column_string + k + ","
             stringified_value.append(v)
-            # if schema[k] == 'integer':
-            #     stringified_value = stringified_value + str(v)
-            # elif schema[k] == 'boolean':
-            #     stringified_value = stringified_value + str(v)
-            # else:
-            #     stringified_value = stringified_value + "'" + str(v) + "'"
-            # stringified_value = stringified_value + ","
 
     column_string += 'created_at,updated_at'
     current_time = str(datetime.now().replace(microsecond=0).isoformat())
@@ -136,28 +138,8 @@ pg_connection.commit();
 #
 # cur = conn.cursor()
 #
-# k = "category,declined_count,fid,is_canceled,venue_longitude,maybe_count,type,is_page_owned,venue_latitude,guest_list_enabled,name,timezone,interested_count,handle,venue_city,noreply_count,venue_state,attending_count,start_time,can_guests_invite,is_viewer_admin,venue_name,venue_fid,venue_country,updated_time,created_at,updated_at"
-# p = "'SPORTS_EVENT',0,'1073154732805592',False,'-73.992761112223',23,'public',False,'40.750579714048',True,'World Championship Boxing:  Gennady Golovkin vs. Daniel Geale','America/New_York',23,'thegarden','New York',0,'NY',2,'2038-11-30T14:00:00-0500',True,False,'The Garden','28859306498','United States','2016-10-21T23:40:48+0000','2017-01-12 04:09:30.004935','2017-01-12 04:09:30.004935'"
+# cur.execute("""SELECT COUNT(*) FROM EVENTS""")
 #
-# sql = """INSERT INTO events (category,declined_count,fid,is_canceled,venue_longitude,maybe_count,type,is_page_owned,venue_latitude,guest_list_enabled,name,timezone,interested_count,handle,venue_city,noreply_count,venue_state,attending_count,start_time,can_guests_invite,is_viewer_admin,venue_name,venue_fid,venue_country,updated_time,created_at,updated_at) VALUES ('SPORTS_EVENT',0,'1073154732805592',False,'-73.992761112223',23,'public',False,'40.750579714048',True,'World Championship Boxing:  Gennady Golovkin vs. Daniel Geale','America/New_York',23,'thegarden','New York',0,'NY',2,'2038-11-30T14:00:00-0500',True,False,'The Garden','28859306498','United States','2016-10-21T23:40:48+0000','2017-01-12 04:09:30.004935','2017-01-12 04:09:30.004935');"""
+# rows = cur.fetchone()
 #
-# cur.execute(sql)
-#
-# conn.commit()
-
-# cur.execute("""INSERT INTO events(handle,created_at,updated_at) VALUES ('handle','2016-10-21T23:40:48+0000','2016-10-21T23:40:48+0000');""")
-
-# rows = cur.fetchall()
-
-# print("\nShow me the databases:\n")
-# for row in rows:
-#     print("   ", row[0])
-
-# r = requests.post("https://graph.facebook.com/v2.6/oauth/access_token", data={'client_id': '587748278082312', 'client_secret': '653f038ce5648e38a231609066407d86', 'grant_type': 'client_credentials'})
-#
-# token = r.json()['access_token']
-#
-# response = requests.get("https://graph.facebook.com/v2.8/thegarden/events?access_token=" + token + "&debug=all&format=json&method=get&pretty=0&suppress_http_code=1")
-#
-#
-# print(response.json())
+# print(rows[0])
