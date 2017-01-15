@@ -1,6 +1,7 @@
 import requests
 import psycopg2
 from datetime import datetime
+import time
 
 HANDLES_LIST = ['nyrangers', 'thegarden', 'terminal5nyc', 'websterhallnyc', 'brooklynbowl', 'thestudioatwebsterhall', 'barclayscenter', 'townhallnyc', 'radiocitymusichall', 'boweryballroom', 'mercuryloungeny', 'cakeshopnyc', '92YConcerts', 'pianosnyc', 'citywinerynyc', 'goodroombk', 'madisonsquarepark', 'centralparknyc', 'summerstagenyc', 'prospectparkbrooklyn', 'apollotheater', 'beacontheatre', 'carnegiehall', 'bluenotenyc', 'jazzstandard', 'theiridium', 'dizzysclubcocacola', 'bbkingbluesnyc', 'outputclub', 'nyuskirball', 'musichallofwb', 'knittingfactorybrooklyn', 'javitscenter', 'smorgasburg', 'bkbazaar', 'babysallright', 'theboweryelectric', 'stvitusbar', 'lprnyc', 'leftfield', 'highlineballroom', 'irvingplaza', 'warsawconcerts', 'popgunpresents', 'roughtradenyc', 'gramercytheatre', 'subrosanyc', 'brooklyncenterfortheperformingarts', 'wickedwillysnyc', 'maxwellshoboken', 'thebellhouseny', 'dromny', 'cmoneverybodybk', 'rooftopfilmsinc', 'sobsnyc', 'blackbearbk', 'therockshop', 'nationalsawdust', 'sheastadiumbk', 'cuttingroomnyc', 'silentbarn', 'lavony', 'thehallbrooklyn', 'marqueeny', 'theshopbk', 'transpecos', 'rockwoodmusichall', 'cieloclub', 'slakenyc', 'spaceibizanewyork', 'birdlandjazzclub', 'foresthillsstadium', 'littlefieldnewyorkcity', 'kingstheatrebklyn', 'metopera', 'prucenter', 'yankeestadium0', 'yankees', 'mets', 'metlifestadium', 'stage48', 'houseofyes', 'nyknicks', 'newyorkislanders', 'newyorkgiants', 'nyliberty', 'newyorkriveters', '4040club', 'yiddishnewyork', 'nikonjbt']
 
@@ -41,8 +42,38 @@ def crawl_all_events():
     for handle in TEST_HANDLE_LIST:
         crawl_page_events(handle)
 
+def crawl_events_in_time_frame(handle):
+    provided_start_date = '2017-01-01T00:00:00'
+    provided_end_date = '2017-05-01T00:00:00'
+    start_date = epoch(provided_start_date)
+    end_date = epoch(provided_end_date)
+
+    url = FACEBOOK_GRAPH_API + handle + "/events?access_token=" + access_token + "&since=" + start_date + "&limit=1000&debug=all&format=json&method=get&pretty=0&suppress_http_code=1"
+
+    while url != None:
+        full_response = get_api_response(url)
+        paginated_response = full_response['data']
+        max_end_date = 0
+        for event in paginated_response:
+            epoch_start_time = epoch(event['start_time'])
+            if epoch_start_time < end_date:
+                enriched_event = enrich_event(event["id"], handle)
+                persist_event(enriched_event, stringify_schema(enriched_event))
+                if epoch_start_time > max_end_date:
+                    max_end_date = epoch_start_time
+        if max_end_date > end_time:
+            url = None
+        else:
+            url = FACEBOOK_GRAPH_API + handle + "/events?access_token=" + access_token + "&since=" + max_end_date + "&limit=1000&debug=all&format=json&method=get&pretty=0&suppress_http_code=1"
+
+def epoch_time(string_date):
+    yyyyMMdd_date = string_date.split("T")[0]
+    pattern = "%Y-%m-%d"
+    epoch = int(time.mktime(time.strptime(yyyyMMdd_date, pattern)))
+    return epoch
+
 def crawl_page_events(handle):
-    url = FACEBOOK_GRAPH_API + handle + "/events?access_token=" + access_token + "&debug=all&format=json&method=get&pretty=0&suppress_http_code=1"
+    url = FACEBOOK_GRAPH_API + handle + "/events?access_token=" + access_token + "&limit=1000&debug=all&format=json&method=get&pretty=0&suppress_http_code=1"
     while url != None:
         full_response = get_api_response(url)
         paginated_response = get_api_response(url)['data']
@@ -54,7 +85,6 @@ def crawl_page_events(handle):
 def enrich_event(event_id, handle):
     event_url = FACEBOOK_GRAPH_API + event_id + "?access_token=" + access_token + "&fields=attending_count,can_guests_invite,category,declined_count,end_time,guest_list_enabled,interested_count,is_canceled,is_page_owned,is_viewer_admin,maybe_count,name,noreply_count,parent_group,place,start_time,timezone,type,updated_time&debug=all&format=json&method=get&pretty=0&suppress_http_code=1"
     response = get_api_response(event_url)
-
 
     response['fid'] = response['id']
     response['handle'] = handle
@@ -80,6 +110,11 @@ def enrich_event(event_id, handle):
     return response
 
 def persist_event(event, stringified_event):
+    stringified_event_0 = stringified_event[0] + 'created_at,updated_at'
+    current_time = str(datetime.now().replace(microsecond=0).isoformat())
+    stringified_event[1].append(current_time)
+    stringified_event[1].append(current_time)
+
     cursor = pg_connection.cursor()
 
     sql = "SELECT COUNT(*) FROM events WHERE name=%s AND venue_fid=%s AND start_time=%s"
@@ -88,15 +123,20 @@ def persist_event(event, stringified_event):
 
     count = cursor.fetchone()[0]
 
-    if count == 0:
-        formatter_list = []
-        for i in range(0, len(stringified_event[1])):
-            formatter_list.append('%s')
+    formatter_list = []
+    for i in range(0, len(stringified_event[1])):
+        formatter_list.append('%s')
 
-        formatter_list_string = ','.join(formatter_list)
-        sql = "INSERT INTO events (" + stringified_event[0] + ") VALUES (" + formatter_list_string + ")"
+    formatter_list_string = ','.join(formatter_list)
+    if count == 0:
+        sql = "INSERT INTO events (" + stringified_event_0 + ") VALUES (" + formatter_list_string + ")"
         values = stringified_event[1]
         cursor.execute(sql, values)
+        pg_connection.commit()
+    else:
+        update_sql = "UPDATE events SET (" + stringified_event_0 + ") = (" + formatter_list_string + ") WHERE fid='" + event['fid'] + "'"
+        values = stringified_event[1]
+        cursor.execute(update_sql, values)
         pg_connection.commit()
 
 def stringify_schema(response_dict):
@@ -108,11 +148,6 @@ def stringify_schema(response_dict):
             column_string = column_string + k + ","
             stringified_value.append(v)
 
-    column_string += 'created_at,updated_at'
-    current_time = str(datetime.now().replace(microsecond=0).isoformat())
-    stringified_value.append(current_time)
-    stringified_value.append(current_time)
-    # stringified_value += "'" + current_time + "','" + current_time + "'"
     return column_string, stringified_value
 
 def postgres_connection():
@@ -127,9 +162,10 @@ def postgres_connection():
 access_token = get_access_token()
 pg_connection = postgres_connection()
 
-crawl_page_events('thegarden')
+# crawl_page_events('thegarden')
+crawl_events_in_time_frame('thegarden')
 
-pg_connection.commit();
+# pg_connection.commit();
 
 # try:
 #     conn = psycopg2.connect("dbname='revmax_development' user='nandukalidindi' host='localhost' password='qwerty123'")
@@ -138,8 +174,9 @@ pg_connection.commit();
 #
 # cur = conn.cursor()
 #
-# cur.execute("""SELECT COUNT(*) FROM EVENTS""")
+# cur.execute("""UPDATE events SET (name, handle) = (%s, %s) WHERE fid=%s""", ['what the hell', 'letussee', '303797800000290'])
 #
+# conn.commit()
 # rows = cur.fetchone()
 #
 # print(rows[0])
