@@ -43,12 +43,12 @@ def crawl_all_events():
         crawl_page_events(handle)
 
 def crawl_events_in_time_frame(handle):
-    provided_start_date = '2017-01-01T00:00:00'
-    provided_end_date = '2017-05-01T00:00:00'
+    provided_start_date = '2000-01-01T00:00:00-4000'
+    provided_end_date = '2038-12-31T00:00:00-4000'
     start_date = epoch(provided_start_date)
     end_date = epoch(provided_end_date)
 
-    url = FACEBOOK_GRAPH_API + handle + "/events?access_token=" + access_token + "&since=" + start_date + "&limit=1000&debug=all&format=json&method=get&pretty=0&suppress_http_code=1"
+    url = FACEBOOK_GRAPH_API + handle + "/events?access_token=" + access_token + "&since=" + str(start_date) + "&limit=1000&debug=all&format=json&method=get&pretty=0&suppress_http_code=1"
 
     while url != None:
         full_response = get_api_response(url)
@@ -61,15 +61,20 @@ def crawl_events_in_time_frame(handle):
                 persist_event(enriched_event, stringify_schema(enriched_event))
                 if epoch_start_time > max_end_date:
                     max_end_date = epoch_start_time
-        if max_end_date > end_time:
+
+        if len(paginated_response) == 0:
+            url = None
+        elif full_response.get('paging').get('next') != None:
+            url = full_response.get('paging').get('next')
+        elif max_end_date > end_date:
             url = None
         else:
-            url = FACEBOOK_GRAPH_API + handle + "/events?access_token=" + access_token + "&since=" + max_end_date + "&limit=1000&debug=all&format=json&method=get&pretty=0&suppress_http_code=1"
+            url = FACEBOOK_GRAPH_API + handle + "/events?access_token=" + access_token + "&since=" + str(max_end_date) + "&limit=1000&debug=all&format=json&method=get&pretty=0&suppress_http_code=1"
 
-def epoch_time(string_date):
-    yyyyMMdd_date = string_date.split("T")[0]
-    pattern = "%Y-%m-%d"
-    epoch = int(time.mktime(time.strptime(yyyyMMdd_date, pattern)))
+def epoch(string_date):
+    yyyyMMddTHHMMSS_date = string_date.rpartition("-")[0]
+    pattern = "%Y-%m-%dT%H:%M:%S"
+    epoch = int(time.mktime(time.strptime(yyyyMMddTHHMMSS_date, pattern)))
     return epoch
 
 def crawl_page_events(handle):
@@ -163,7 +168,7 @@ access_token = get_access_token()
 pg_connection = postgres_connection()
 
 # crawl_page_events('thegarden')
-crawl_events_in_time_frame('thegarden')
+crawl_events_in_time_frame('nyrangers')
 
 # pg_connection.commit();
 
