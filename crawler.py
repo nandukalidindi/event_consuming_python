@@ -5,7 +5,7 @@ import time
 
 HANDLES_LIST = ['nyrangers', 'thegarden', 'terminal5nyc', 'websterhallnyc', 'brooklynbowl', 'thestudioatwebsterhall', 'barclayscenter', 'townhallnyc', 'radiocitymusichall', 'boweryballroom', 'mercuryloungeny', 'cakeshopnyc', '92YConcerts', 'pianosnyc', 'citywinerynyc', 'goodroombk', 'madisonsquarepark', 'centralparknyc', 'summerstagenyc', 'prospectparkbrooklyn', 'apollotheater', 'beacontheatre', 'carnegiehall', 'bluenotenyc', 'jazzstandard', 'theiridium', 'dizzysclubcocacola', 'bbkingbluesnyc', 'outputclub', 'nyuskirball', 'musichallofwb', 'knittingfactorybrooklyn', 'javitscenter', 'smorgasburg', 'bkbazaar', 'babysallright', 'theboweryelectric', 'stvitusbar', 'lprnyc', 'leftfield', 'highlineballroom', 'irvingplaza', 'warsawconcerts', 'popgunpresents', 'roughtradenyc', 'gramercytheatre', 'subrosanyc', 'brooklyncenterfortheperformingarts', 'wickedwillysnyc', 'maxwellshoboken', 'thebellhouseny', 'dromny', 'cmoneverybodybk', 'rooftopfilmsinc', 'sobsnyc', 'blackbearbk', 'therockshop', 'nationalsawdust', 'sheastadiumbk', 'cuttingroomnyc', 'silentbarn', 'lavony', 'thehallbrooklyn', 'marqueeny', 'theshopbk', 'transpecos', 'rockwoodmusichall', 'cieloclub', 'slakenyc', 'spaceibizanewyork', 'birdlandjazzclub', 'foresthillsstadium', 'littlefieldnewyorkcity', 'kingstheatrebklyn', 'metopera', 'prucenter', 'yankeestadium0', 'yankees', 'mets', 'metlifestadium', 'stage48', 'houseofyes', 'nyknicks', 'newyorkislanders', 'newyorkgiants', 'nyliberty', 'newyorkriveters', '4040club', 'yiddishnewyork', 'nikonjbt']
 
-TEST_HANDLE_LIST = ['nyrangers']#, 'thegarden', 'terminal5nyc', 'websterhallnyc', 'brooklynbowl']
+TEST_HANDLE_LIST = ['nyrangers', 'thegarden', 'terminal5nyc', 'websterhallnyc', 'brooklynbowl']
 
 FACEBOOK_ACCESS_TOKEN_URL = "https://graph.facebook.com/v2.6/oauth/access_token"
 FACEBOOK_GRAPH_API = "https://graph.facebook.com/v2.8/"
@@ -42,12 +42,20 @@ def crawl_all_events():
     for handle in TEST_HANDLE_LIST:
         crawl_page_events(handle)
 
-def crawl_events_in_time_frame(handle):
-    provided_start_date = '2000-01-01T00:00:00-4000'
-    provided_end_date = '2038-12-31T00:00:00-4000'
-    start_date = epoch(provided_start_date)
-    end_date = epoch(provided_end_date)
+def crawl_from_today():
+    current_timestamp = time.mktime(datetime.now().timetuple())
+    super_future_timestamp = epoch('3000-01-01T00:00:00-4000')
 
+def crawl_from_to(handle):
+    start_date = '2000-01-01T00:00:00-4000'
+    end_date = '3000-12-31T00:00:00-4000'
+
+    epoch_start_date = epoch(start_date)
+    epoch_end_date = epoch(end_date)
+
+    crawl_events_in_time_frame(handle, epoch_start_date, epoch_end_date)
+
+def crawl_events_in_time_frame(handle, start_date, end_date):
     url = FACEBOOK_GRAPH_API + handle + "/events?access_token=" + access_token + "&since=" + str(start_date) + "&limit=1000&debug=all&format=json&method=get&pretty=0&suppress_http_code=1"
 
     while url != None:
@@ -175,7 +183,9 @@ access_token = get_access_token()
 pg_connection = postgres_connection()
 
 # crawl_page_events('nyrangers')
-crawl_events_in_time_frame('nyrangers')
+for handle in TEST_HANDLE_LIST:
+    crawl_from_to(handle)
+# crawl_from_to('nyrangers')
 
 # pg_connection.commit();
 
