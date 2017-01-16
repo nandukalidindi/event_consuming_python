@@ -82,7 +82,7 @@ def crawl_events_in_time_frame(handle, start_date, end_date):
     print("CRAWL COMPLETED AT " + str(datetime.now().replace(microsecond=0).isoformat()))
 
 def epoch(string_date):
-    yyyyMMddTHHMMSS_date = string_date.rpartition("-")[0]
+    yyyyMMddTHHMMSS_date = string_date.rpartition("-")[0] if (len(string_date.rpartition("+")[0]) == 0) else string_date.rpartition("+")[0]
     pattern = "%Y-%m-%dT%H:%M:%S"
     epoch = int(time.mktime(time.strptime(yyyyMMddTHHMMSS_date, pattern)))
     return epoch
@@ -107,16 +107,16 @@ def enrich_event(event_id, handle):
     response['venue_capacity'] = None
     # print(response)
     if response.get('place') != None:
-        place = response['place']
-        response['venue_fid'] = place['id']
-        response['venue_name'] = place['name']
+        place = response.get('place')
+        response['venue_fid'] = place.get('id')
+        response['venue_name'] = place.get('name')
         if place.get('location') != None:
             location = place['location']
-            response['venue_city'] = location['city']
-            response['venue_state'] = location['state']
-            response['venue_country'] = location['country']
-            response['venue_latitude'] = location['latitude']
-            response['venue_longitude'] = location['longitude']
+            response['venue_city'] = location.get('city')
+            response['venue_state'] = location.get('state')
+            response['venue_country'] = location.get('country')
+            response['venue_latitude'] = location.get('latitude')
+            response['venue_longitude'] = location.get('longitude')
         del response['place']
 
     del response['id']
@@ -182,23 +182,5 @@ def postgres_connection():
 access_token = get_access_token()
 pg_connection = postgres_connection()
 
-# crawl_page_events('nyrangers')
 for handle in TEST_HANDLE_LIST:
     crawl_from_to(handle)
-# crawl_from_to('nyrangers')
-
-# pg_connection.commit();
-
-# try:
-#     conn = psycopg2.connect("dbname='revmax_development' user='nandukalidindi' host='localhost' password='qwerty123'")
-# except:
-#     print("I am unable to connect to the database")
-#
-# cur = conn.cursor()
-#
-# cur.execute("""UPDATE events SET (name, handle) = (%s, %s) WHERE fid=%s""", ['what the hell', 'letussee', '303797800000290'])
-#
-# conn.commit()
-# rows = cur.fetchone()
-#
-# print(rows[0])
