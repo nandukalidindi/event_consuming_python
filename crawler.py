@@ -71,6 +71,8 @@ def crawl_events_in_time_frame(handle):
         else:
             url = FACEBOOK_GRAPH_API + handle + "/events?access_token=" + access_token + "&since=" + str(max_end_date) + "&limit=1000&debug=all&format=json&method=get&pretty=0&suppress_http_code=1"
 
+    print("CRAWL COMPLETED AT " + str(datetime.now().replace(microsecond=0).isoformat()))
+
 def epoch(string_date):
     yyyyMMddTHHMMSS_date = string_date.rpartition("-")[0]
     pattern = "%Y-%m-%dT%H:%M:%S"
@@ -95,7 +97,7 @@ def enrich_event(event_id, handle):
     response['handle'] = handle
     response['geometry'] = None
     response['venue_capacity'] = None
-    print(response)
+    # print(response)
     if response.get('place') != None:
         place = response['place']
         response['venue_fid'] = place['id']
@@ -122,8 +124,13 @@ def persist_event(event, stringified_event):
 
     cursor = pg_connection.cursor()
 
-    sql = "SELECT COUNT(*) FROM events WHERE name=%s AND venue_fid=%s AND start_time=%s"
-    values = [event.get('name'), event.get('venue_fid'), event.get('start_time')]
+    if event.get('venue_fid') == None:
+        sql = "SELECT COUNT(*) FROM events WHERE name=%s AND venue_fid IS NULL AND start_time=%s"
+        values = [event.get('name'), event.get('start_time')]
+    else:
+        sql = "SELECT COUNT(*) FROM events WHERE name=%s AND venue_fid=%s AND start_time=%s"
+        values = [event.get('name'), event.get('venue_fid'), event.get('start_time')]
+
     cursor.execute(sql, values)
 
     count = cursor.fetchone()[0]
@@ -167,7 +174,7 @@ def postgres_connection():
 access_token = get_access_token()
 pg_connection = postgres_connection()
 
-# crawl_page_events('thegarden')
+# crawl_page_events('nyrangers')
 crawl_events_in_time_frame('nyrangers')
 
 # pg_connection.commit();
