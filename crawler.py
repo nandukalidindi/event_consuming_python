@@ -25,7 +25,7 @@ USER = "nandukalidindi"
 PASSWORD = "qwerty123"
 
 def get_schema():
-    return {'name': 'string', 'start_time': 'datetime', 'handle': 'string', 'fid': 'string', 'attending_count': 'integer', 'can_guests_invite': 'boolean', 'category': 'string', 'declined_count': 'integer', 'guest_list_enabled': 'boolean', 'interested_count': 'integer', 'is_canceled': 'boolean', 'is_page_owned': 'boolean', 'is_viewer_admin': 'boolean', 'maybe_count': 'integer', 'noreply_count': 'integer', 'timezone': 'string', 'end_time': 'datetime', 'updated_time': 'datetime', 'type': 'string', 'venue_fid': 'string', 'venue_name': 'string', 'venue_city': 'string', 'venue_state': 'string', 'venue_country': 'string', 'venue_latitude': 'string', 'venue_longitude': '', 'geometry': 'string', 'venue_capacity': 'integer'}
+    return {'name': 'string', 'start_time': 'datetime', 'handle': 'string', 'fid': 'string', 'attending_count': 'integer', 'can_guests_invite': 'boolean', 'category': 'string', 'declined_count': 'integer', 'guest_list_enabled': 'boolean', 'interested_count': 'integer', 'is_canceled': 'boolean', 'is_page_owned': 'boolean', 'is_viewer_admin': 'boolean', 'maybe_count': 'integer', 'noreply_count': 'integer', 'timezone': 'string', 'end_time': 'datetime', 'updated_time': 'datetime', 'type': 'string', 'venue_fid': 'string', 'venue_name': 'string', 'venue_city': 'string', 'venue_state': 'string', 'venue_country': 'string', 'venue_latitude': 'string', 'venue_longitude': '', 'geometry': 'geometry', 'venue_capacity': 'integer'}
 
 def get_access_token():
     oauth_response = requests.post(FACEBOOK_ACCESS_TOKEN_URL, data={ 'client_id': APP_CLIENT_ID, 'client_secret': APP_CLIENT_SECRET, 'grant_type': GRANT_TYPE } )
@@ -148,6 +148,13 @@ def persist_event(event, stringified_event):
         formatter_list.append('%s')
 
     formatter_list_string = ','.join(formatter_list)
+
+    if event.get('venue_latitude') != None and event.get('venue_longitude') != None:
+        stringified_event_0 = stringified_event_0 + ",geometry"
+        formatter_list_string = formatter_list_string + ",ST_GeomFromText(%s,4326)"
+        coordinates = "POINT(%s %s)" % (event.get('venue_latitude'), event.get('venue_longitude'))
+        stringified_event[1].append(coordinates)
+
     if count == 0:
         sql = "INSERT INTO events (" + stringified_event_0 + ") VALUES (" + formatter_list_string + ")"
         values = stringified_event[1]
