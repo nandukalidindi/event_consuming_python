@@ -198,11 +198,8 @@ def postgres_connection():
     return connection;
 
 
-# access_token = get_access_token()
-# pg_connection = postgres_connection()
-#
-# for handle in TEST_HANDLE_LIST:
-#     crawl_from_to(handle)
-
+access_token = get_access_token()
+pg_connection = postgres_connection()
 handle_list = get_handles_from_csv("facebook_pages.csv")
-print(handle_list)
+for handle in handle_list:    
+    crawl_from_to(handle)
