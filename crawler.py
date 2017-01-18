@@ -2,6 +2,7 @@ import requests
 import psycopg2
 from datetime import datetime
 import time
+import csv
 
 HANDLES_LIST = ['nyrangers', 'thegarden', 'terminal5nyc', 'websterhallnyc', 'brooklynbowl', 'thestudioatwebsterhall', 'barclayscenter', 'townhallnyc', 'radiocitymusichall', 'boweryballroom', 'mercuryloungeny', 'cakeshopnyc', '92YConcerts', 'pianosnyc', 'citywinerynyc', 'goodroombk', 'madisonsquarepark', 'centralparknyc', 'summerstagenyc', 'prospectparkbrooklyn', 'apollotheater', 'beacontheatre', 'carnegiehall', 'bluenotenyc', 'jazzstandard', 'theiridium', 'dizzysclubcocacola', 'bbkingbluesnyc', 'outputclub', 'nyuskirball', 'musichallofwb', 'knittingfactorybrooklyn', 'javitscenter', 'smorgasburg', 'bkbazaar', 'babysallright', 'theboweryelectric', 'stvitusbar', 'lprnyc', 'leftfield', 'highlineballroom', 'irvingplaza', 'warsawconcerts', 'popgunpresents', 'roughtradenyc', 'gramercytheatre', 'subrosanyc', 'brooklyncenterfortheperformingarts', 'wickedwillysnyc', 'maxwellshoboken', 'thebellhouseny', 'dromny', 'cmoneverybodybk', 'rooftopfilmsinc', 'sobsnyc', 'blackbearbk', 'therockshop', 'nationalsawdust', 'sheastadiumbk', 'cuttingroomnyc', 'silentbarn', 'lavony', 'thehallbrooklyn', 'marqueeny', 'theshopbk', 'transpecos', 'rockwoodmusichall', 'cieloclub', 'slakenyc', 'spaceibizanewyork', 'birdlandjazzclub', 'foresthillsstadium', 'littlefieldnewyorkcity', 'kingstheatrebklyn', 'metopera', 'prucenter', 'yankeestadium0', 'yankees', 'mets', 'metlifestadium', 'stage48', 'houseofyes', 'nyknicks', 'newyorkislanders', 'newyorkgiants', 'nyliberty', 'newyorkriveters', '4040club', 'yiddishnewyork', 'nikonjbt']
 
@@ -23,6 +24,17 @@ HOST = "localhost"
 DATABASE = "revmax_development"
 USER = "nandukalidindi"
 PASSWORD = "qwerty123"
+
+def get_handles_from_csv(filename):
+    with open(filename) as file_csv:
+        csv_reader = csv.reader(file_csv, delimiter=',', skipinitialspace=True)
+        handle_list =  []
+        for row in csv_reader:
+            if row[1] != None and row[1] != '' and row[1] != 'Handle':
+                handle_list.append(row[1])
+
+    return handle_list
+
 
 def get_schema():
     return {'name': 'string', 'start_time': 'datetime', 'handle': 'string', 'fid': 'string', 'attending_count': 'integer', 'can_guests_invite': 'boolean', 'category': 'string', 'declined_count': 'integer', 'guest_list_enabled': 'boolean', 'interested_count': 'integer', 'is_canceled': 'boolean', 'is_page_owned': 'boolean', 'is_viewer_admin': 'boolean', 'maybe_count': 'integer', 'noreply_count': 'integer', 'timezone': 'string', 'end_time': 'datetime', 'updated_time': 'datetime', 'type': 'string', 'venue_fid': 'string', 'venue_name': 'string', 'venue_city': 'string', 'venue_state': 'string', 'venue_country': 'string', 'venue_latitude': 'string', 'venue_longitude': '', 'geometry': 'geometry', 'venue_capacity': 'integer'}
@@ -186,8 +198,11 @@ def postgres_connection():
     return connection;
 
 
-access_token = get_access_token()
-pg_connection = postgres_connection()
+# access_token = get_access_token()
+# pg_connection = postgres_connection()
+#
+# for handle in TEST_HANDLE_LIST:
+#     crawl_from_to(handle)
 
-for handle in TEST_HANDLE_LIST:
-    crawl_from_to(handle)
+handle_list = get_handles_from_csv("facebook_pages.csv")
+print(handle_list)
