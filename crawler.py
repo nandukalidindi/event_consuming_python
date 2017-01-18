@@ -6,10 +6,10 @@ import csv
 
 HANDLES_LIST = ['nyrangers', 'thegarden', 'terminal5nyc', 'websterhallnyc', 'brooklynbowl', 'thestudioatwebsterhall', 'barclayscenter', 'townhallnyc', 'radiocitymusichall', 'boweryballroom', 'mercuryloungeny', 'cakeshopnyc', '92YConcerts', 'pianosnyc', 'citywinerynyc', 'goodroombk', 'madisonsquarepark', 'centralparknyc', 'summerstagenyc', 'prospectparkbrooklyn', 'apollotheater', 'beacontheatre', 'carnegiehall', 'bluenotenyc', 'jazzstandard', 'theiridium', 'dizzysclubcocacola', 'bbkingbluesnyc', 'outputclub', 'nyuskirball', 'musichallofwb', 'knittingfactorybrooklyn', 'javitscenter', 'smorgasburg', 'bkbazaar', 'babysallright', 'theboweryelectric', 'stvitusbar', 'lprnyc', 'leftfield', 'highlineballroom', 'irvingplaza', 'warsawconcerts', 'popgunpresents', 'roughtradenyc', 'gramercytheatre', 'subrosanyc', 'brooklyncenterfortheperformingarts', 'wickedwillysnyc', 'maxwellshoboken', 'thebellhouseny', 'dromny', 'cmoneverybodybk', 'rooftopfilmsinc', 'sobsnyc', 'blackbearbk', 'therockshop', 'nationalsawdust', 'sheastadiumbk', 'cuttingroomnyc', 'silentbarn', 'lavony', 'thehallbrooklyn', 'marqueeny', 'theshopbk', 'transpecos', 'rockwoodmusichall', 'cieloclub', 'slakenyc', 'spaceibizanewyork', 'birdlandjazzclub', 'foresthillsstadium', 'littlefieldnewyorkcity', 'kingstheatrebklyn', 'metopera', 'prucenter', 'yankeestadium0', 'yankees', 'mets', 'metlifestadium', 'stage48', 'houseofyes', 'nyknicks', 'newyorkislanders', 'newyorkgiants', 'nyliberty', 'newyorkriveters', '4040club', 'yiddishnewyork', 'nikonjbt']
 
-TEST_HANDLE_LIST = ['nyrangers', 'thegarden', 'terminal5nyc', 'websterhallnyc', 'brooklynbowl']
-
 FACEBOOK_ACCESS_TOKEN_URL = "https://graph.facebook.com/v2.6/oauth/access_token"
 FACEBOOK_GRAPH_API = "https://graph.facebook.com/v2.8/"
+ADDITIONAL_PARAMS = "&debug=all&format=json&method=get&pretty=0&suppress_http_code=1"
+FETCHABLE_EVENT_FIELDS = "&fields=attending_count,can_guests_invite,category,declined_count,end_time,guest_list_enabled,interested_count,is_canceled,is_page_owned,is_viewer_admin,maybe_count,name,noreply_count,parent_group,place,start_time,timezone,type,updated_time"
 
 APP_CLIENT_ID = "587748278082312"
 APP_CLIENT_SECRET = "653f038ce5648e38a231609066407d86"
@@ -36,8 +36,37 @@ def get_handles_from_csv(filename):
     return handle_list
 
 
-def get_schema():
-    return {'name': 'string', 'start_time': 'datetime', 'handle': 'string', 'fid': 'string', 'attending_count': 'integer', 'can_guests_invite': 'boolean', 'category': 'string', 'declined_count': 'integer', 'guest_list_enabled': 'boolean', 'interested_count': 'integer', 'is_canceled': 'boolean', 'is_page_owned': 'boolean', 'is_viewer_admin': 'boolean', 'maybe_count': 'integer', 'noreply_count': 'integer', 'timezone': 'string', 'end_time': 'datetime', 'updated_time': 'datetime', 'type': 'string', 'venue_fid': 'string', 'venue_name': 'string', 'venue_city': 'string', 'venue_state': 'string', 'venue_country': 'string', 'venue_latitude': 'string', 'venue_longitude': '', 'geometry': 'geometry', 'venue_capacity': 'integer'}
+def schema():
+    return {
+                'name'              : 'varchar',
+                'start_time'        : 'datetime',
+                'handle'            : 'varchar',
+                'fid'               : 'varchar',
+                'attending_count'   : 'integer',
+                'can_guests_invite' : 'boolean',
+                'category'          : 'string',
+                'declined_count'    : 'integer',
+                'guest_list_enabled': 'boolean',
+                'interested_count'  : 'integer',
+                'is_canceled'       : 'boolean',
+                'is_page_owned'     : 'boolean',
+                'is_viewer_admin'   : 'boolean',
+                'maybe_count'       : 'integer',
+                'noreply_count'     : 'integer',
+                'timezone'          : 'varchar',
+                'end_time'          : 'datetime',
+                'updated_time'      : 'datetime',
+                'type'              : 'varchar',
+                'venue_fid'         : 'varchar',
+                'venue_name'        : 'varchar',
+                'venue_city'        : 'varchar',
+                'venue_state'       : 'varchar',
+                'venue_country'     : 'varchar',
+                'venue_latitude'    : 'varchar',
+                'venue_longitude'   : 'varchar',
+                'geometry'          : 'geometry',
+                'venue_capacity'    : 'integer'
+            }
 
 def get_access_token():
     oauth_response = requests.post(FACEBOOK_ACCESS_TOKEN_URL, data={ 'client_id': APP_CLIENT_ID, 'client_secret': APP_CLIENT_SECRET, 'grant_type': GRANT_TYPE } )
@@ -68,7 +97,9 @@ def crawl_from_to(handle):
     crawl_events_in_time_frame(handle, epoch_start_date, epoch_end_date)
 
 def crawl_events_in_time_frame(handle, start_date, end_date):
-    url = FACEBOOK_GRAPH_API + handle + "/events?access_token=" + access_token + "&since=" + str(start_date) + "&limit=1000&debug=all&format=json&method=get&pretty=0&suppress_http_code=1"
+    # url = FACEBOOK_GRAPH_API + handle + "/events?access_token=" + access_token + "&since=" + str(start_date) + "&limit=1000&debug=all&format=json&method=get&pretty=0&suppress_http_code=1"
+
+    url = "%s%s/events?access_token=%s&since=%s&limit=1000%s" % (FACEBOOK_GRAPH_API, handle, access_token, str(start_date), ADDITIONAL_PARAMS)
 
     while url != None:
         full_response = get_api_response(url)
@@ -89,7 +120,8 @@ def crawl_events_in_time_frame(handle, start_date, end_date):
         elif max_end_date > end_date:
             url = None
         else:
-            url = FACEBOOK_GRAPH_API + handle + "/events?access_token=" + access_token + "&since=" + str(max_end_date) + "&limit=1000&debug=all&format=json&method=get&pretty=0&suppress_http_code=1"
+            # url = FACEBOOK_GRAPH_API + handle + "/events?access_token=" + access_token + "&since=" + str(max_end_date) + "&limit=1000&debug=all&format=json&method=get&pretty=0&suppress_http_code=1"
+            url = "%s%s/events?access_token=%s&since=%s&limit=1000%s" % (FACEBOOK_GRAPH_API, handle, access_token, str(max_end_date), ADDITIONAL_PARAMS)
 
     print("CRAWL COMPLETED AT " + str(datetime.now().replace(microsecond=0).isoformat()))
 
@@ -100,7 +132,8 @@ def epoch(string_date):
     return epoch
 
 def crawl_page_events(handle):
-    url = FACEBOOK_GRAPH_API + handle + "/events?access_token=" + access_token + "&limit=1000&debug=all&format=json&method=get&pretty=0&suppress_http_code=1"
+    # url = FACEBOOK_GRAPH_API + handle + "/events?access_token=" + access_token + "&limit=1000&debug=all&format=json&method=get&pretty=0&suppress_http_code=1"
+    url = "%s%s/events?access_token=%s%s" % (FACEBOOK_GRAPH_API, handle, access_token, ADDITIONAL_PARAMS)
     while url != None:
         full_response = get_api_response(url)
         paginated_response = get_api_response(url)['data']
@@ -110,7 +143,9 @@ def crawl_page_events(handle):
         url = full_response.get('paging').get('next')
 
 def enrich_event(event_id, handle):
-    event_url = FACEBOOK_GRAPH_API + event_id + "?access_token=" + access_token + "&fields=attending_count,can_guests_invite,category,declined_count,end_time,guest_list_enabled,interested_count,is_canceled,is_page_owned,is_viewer_admin,maybe_count,name,noreply_count,parent_group,place,start_time,timezone,type,updated_time&debug=all&format=json&method=get&pretty=0&suppress_http_code=1"
+    # event_url = FACEBOOK_GRAPH_API + event_id + "?access_token=" + access_token + "&fields=attending_count,can_guests_invite,category,declined_count,end_time,guest_list_enabled,interested_count,is_canceled,is_page_owned,is_viewer_admin,maybe_count,name,noreply_count,parent_group,place,start_time,timezone,type,updated_time&debug=all&format=json&method=get&pretty=0&suppress_http_code=1"
+
+    event_url = "%s%s?access_token=%s%s%s" % (FACEBOOK_GRAPH_API, event_id, access_token, FETCHABLE_EVENT_FIELDS, ADDITIONAL_PARAMS)
     response = get_api_response(event_url)
 
     response['fid'] = response['id']
@@ -181,7 +216,6 @@ def persist_event(event, stringified_event):
 def stringify_schema(response_dict):
     stringified_value = []
     column_string = ""
-    schema = get_schema()
     for k, v in response_dict.items():
         if v != None:
             column_string = column_string + k + ","
@@ -193,7 +227,7 @@ def postgres_connection():
     try:
         connection = psycopg2.connect("dbname={} user={} host={} password={}".format(DATABASE, USER, HOST, PASSWORD))
     except:
-        print("DATABASE NOT ACCESSIBLE")
+        print("Unable to connect database. Please try again!")
 
     return connection;
 
@@ -201,5 +235,6 @@ def postgres_connection():
 access_token = get_access_token()
 pg_connection = postgres_connection()
 handle_list = get_handles_from_csv("facebook_pages.csv")
-for handle in handle_list:    
+handle_list = ['nyrangers']#, 'thegarden', 'terminal5nyc', 'websterhallnyc', 'brooklynbowl']
+for handle in handle_list:
     crawl_from_to(handle)
