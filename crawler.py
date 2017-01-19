@@ -97,8 +97,6 @@ def crawl_from_to(handle):
     crawl_events_in_time_frame(handle, epoch_start_date, epoch_end_date)
 
 def crawl_events_in_time_frame(handle, start_date, end_date):
-    # url = FACEBOOK_GRAPH_API + handle + "/events?access_token=" + access_token + "&since=" + str(start_date) + "&limit=1000&debug=all&format=json&method=get&pretty=0&suppress_http_code=1"
-
     url = "%s%s/events?access_token=%s&since=%s&limit=1000%s" % (FACEBOOK_GRAPH_API, handle, access_token, str(start_date), ADDITIONAL_PARAMS)
 
     while url != None:
@@ -120,7 +118,6 @@ def crawl_events_in_time_frame(handle, start_date, end_date):
         elif max_end_date > end_date:
             url = None
         else:
-            # url = FACEBOOK_GRAPH_API + handle + "/events?access_token=" + access_token + "&since=" + str(max_end_date) + "&limit=1000&debug=all&format=json&method=get&pretty=0&suppress_http_code=1"
             url = "%s%s/events?access_token=%s&since=%s&limit=1000%s" % (FACEBOOK_GRAPH_API, handle, access_token, str(max_end_date), ADDITIONAL_PARAMS)
 
     print("CRAWL COMPLETED AT " + str(datetime.now().replace(microsecond=0).isoformat()))
@@ -132,7 +129,6 @@ def epoch(string_date):
     return epoch
 
 def crawl_page_events(handle):
-    # url = FACEBOOK_GRAPH_API + handle + "/events?access_token=" + access_token + "&limit=1000&debug=all&format=json&method=get&pretty=0&suppress_http_code=1"
     url = "%s%s/events?access_token=%s%s" % (FACEBOOK_GRAPH_API, handle, access_token, ADDITIONAL_PARAMS)
     while url != None:
         full_response = get_api_response(url)
@@ -143,8 +139,6 @@ def crawl_page_events(handle):
         url = full_response.get('paging').get('next')
 
 def enrich_event(event_id, handle):
-    # event_url = FACEBOOK_GRAPH_API + event_id + "?access_token=" + access_token + "&fields=attending_count,can_guests_invite,category,declined_count,end_time,guest_list_enabled,interested_count,is_canceled,is_page_owned,is_viewer_admin,maybe_count,name,noreply_count,parent_group,place,start_time,timezone,type,updated_time&debug=all&format=json&method=get&pretty=0&suppress_http_code=1"
-
     event_url = "%s%s?access_token=%s%s%s" % (FACEBOOK_GRAPH_API, event_id, access_token, FETCHABLE_EVENT_FIELDS, ADDITIONAL_PARAMS)
     response = get_api_response(event_url)
 
@@ -238,3 +232,5 @@ handle_list = get_handles_from_csv("facebook_pages.csv")
 handle_list = ['nyrangers']#, 'thegarden', 'terminal5nyc', 'websterhallnyc', 'brooklynbowl']
 for handle in handle_list:
     crawl_from_to(handle)
+
+pg_connection.close()
