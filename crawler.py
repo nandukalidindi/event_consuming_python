@@ -88,8 +88,8 @@ def crawl_from_today():
     super_future_timestamp = epoch('3000-01-01T00:00:00-4000')
 
 def crawl_from_to(handle):
-    start_date = '2000-01-01T00:00:00-4000'
-    end_date = '3000-12-31T00:00:00-4000'
+    start_date = '2017-01-01T00:00:00-4000'
+    end_date = '2018-01-01T00:00:00-4000'
 
     epoch_start_date = epoch(start_date)
     epoch_end_date = epoch(end_date)
@@ -146,6 +146,8 @@ def enrich_event(event_id, handle):
     response['handle'] = handle
     response['geometry'] = None
     response['venue_capacity'] = None
+    response['created_at'] = str(datetime.now().replace(microsecond=0).isoformat())
+    response['updated_at'] = str(datetime.now().replace(microsecond=0).isoformat())
     # print(response)
     if response.get('place') != None:
         place = response.get('place')
@@ -166,11 +168,7 @@ def enrich_event(event_id, handle):
     return response
 
 def persist_event(event, stringified_event):
-    stringified_event_0 = stringified_event[0] + 'created_at,updated_at'
-    current_time = str(datetime.now().replace(microsecond=0).isoformat())
-    stringified_event[1].append(current_time)
-    stringified_event[1].append(current_time)
-
+    stringified_event_0 = stringified_event[0][:-1]
     cursor = pg_connection.cursor()
 
     if event.get('venue_fid') == None:
@@ -207,10 +205,10 @@ def persist_event(event, stringified_event):
         cursor.execute(update_sql, values)
         pg_connection.commit()
 
-def stringify_schema(response_dict):
+def stringify_schema(dictionary):
     stringified_value = []
     column_string = ""
-    for k, v in response_dict.items():
+    for k, v in dictionary.items():
         if v != None:
             column_string = column_string + k + ","
             stringified_value.append(v)
