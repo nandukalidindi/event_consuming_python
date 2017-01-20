@@ -9,13 +9,13 @@ HANDLES_LIST = ['nyrangers', 'thegarden', 'terminal5nyc', 'websterhallnyc', 'bro
 FACEBOOK_ACCESS_TOKEN_URL = "https://graph.facebook.com/v2.6/oauth/access_token"
 FACEBOOK_GRAPH_API = "https://graph.facebook.com/v2.8/"
 ADDITIONAL_PARAMS = "&debug=all&format=json&method=get&pretty=0&suppress_http_code=1"
-FETCHABLE_EVENT_FIELDS = "&fields=attending_count,can_guests_invite,category,declined_count,end_time,guest_list_enabled,interested_count,is_canceled,is_page_owned,is_viewer_admin,maybe_count,name,noreply_count,parent_group,place,start_time,timezone,type,updated_time"
+FETCHABLE_EVENT_FIELDS = "&fields=attending_count,can_guests_invite,category,declined_count,end_time,guest_list_enabled,interested_count,is_canceled,is_page_owned,is_viewer_admin,maybe_count,name,noreply_count,place,start_time,timezone,type,updated_time"
 
 APP_CLIENT_ID = "587748278082312"
 APP_CLIENT_SECRET = "653f038ce5648e38a231609066407d86"
 GRANT_TYPE = "client_credentials"
 
-# HOST = "ec2-54-205-81-141.compute-1.amazonaws.com"
+# HOST = "ec2-54-172-214-110.compute-1.amazonaws.com"
 # DATABASE = "revmax_dev"
 # USER = "dev_master"
 # PASSWORD = "master01"
@@ -97,30 +97,35 @@ def crawl_from_to(handle):
     crawl_events_in_time_frame(handle, epoch_start_date, epoch_end_date)
 
 def crawl_events_in_time_frame(handle, start_date, end_date):
+    count = 0
     url = "%s%s/events?access_token=%s&since=%s&limit=1000%s" % (FACEBOOK_GRAPH_API, handle, access_token, str(start_date), ADDITIONAL_PARAMS)
 
     while url != None:
         full_response = get_api_response(url)
-        paginated_response = full_response['data']
+        paginated_response = full_response.get('data')
         max_end_date = 0
-        for event in paginated_response:
-            epoch_start_time = epoch(event['start_time'])
-            if epoch_start_time < end_date:
-                enriched_event = enrich_event(event["id"], handle)
-                persist_event(enriched_event, stringify_schema(enriched_event))
-                if epoch_start_time > max_end_date:
-                    max_end_date = epoch_start_time
+        if paginated_response != None:
+            for event in paginated_response:
+                epoch_start_time = epoch(event['start_time'])
+                if epoch_start_time < end_date:
+                    enriched_event = enrich_event(event["id"], handle)
+                    persist_event(enriched_event, stringify_schema(enriched_event))
+                    count += 1
+                    if epoch_start_time > max_end_date:
+                        max_end_date = epoch_start_time
 
-        if len(paginated_response) == 0:
-            url = None
-        elif full_response.get('paging').get('next') != None:
-            url = full_response.get('paging').get('next')
-        elif max_end_date > end_date:
-            url = None
+            if len(paginated_response) == 0:
+                url = None
+            elif full_response.get('paging').get('next') != None:
+                url = full_response.get('paging').get('next')
+            elif max_end_date > end_date or max_end_date == 0:
+                url = None
+            else:
+                url = "%s%s/events?access_token=%s&since=%s&limit=1000%s" % (FACEBOOK_GRAPH_API, handle, access_token, str(max_end_date), ADDITIONAL_PARAMS)
         else:
-            url = "%s%s/events?access_token=%s&since=%s&limit=1000%s" % (FACEBOOK_GRAPH_API, handle, access_token, str(max_end_date), ADDITIONAL_PARAMS)
+            url = None
 
-    print("CRAWL COMPLETED AT " + str(datetime.now().replace(microsecond=0).isoformat()))
+    print("%s events for handle: %s crawled at %s" % (count, handle, str(datetime.now().replace(microsecond=0).isoformat())))
 
 def epoch(string_date):
     yyyyMMddTHHMMSS_date = string_date.rpartition("-")[0] if (len(string_date.rpartition("+")[0]) == 0) else string_date.rpartition("+")[0]
@@ -148,7 +153,7 @@ def enrich_event(event_id, handle):
     response['venue_capacity'] = None
     response['created_at'] = str(datetime.now().replace(microsecond=0).isoformat())
     response['updated_at'] = str(datetime.now().replace(microsecond=0).isoformat())
-    # print(response)
+
     if response.get('place') != None:
         place = response.get('place')
         response['venue_fid'] = place.get('id')
@@ -160,6 +165,7 @@ def enrich_event(event_id, handle):
             response['venue_country'] = location.get('country')
             response['venue_latitude'] = location.get('latitude')
             response['venue_longitude'] = location.get('longitude')
+            response['venue_capacity'] = 10
         del response['place']
 
     del response['id']
@@ -170,17 +176,6 @@ def enrich_event(event_id, handle):
 def persist_event(event, stringified_event):
     stringified_event_0 = stringified_event[0][:-1]
     cursor = pg_connection.cursor()
-
-    if event.get('venue_fid') == None:
-        sql = "SELECT COUNT(*) FROM events WHERE name=%s AND venue_fid IS NULL AND start_time=%s"
-        values = [event.get('name'), event.get('start_time')]
-    else:
-        sql = "SELECT COUNT(*) FROM events WHERE name=%s AND venue_fid=%s AND start_time=%s"
-        values = [event.get('name'), event.get('venue_fid'), event.get('start_time')]
-
-    cursor.execute(sql, values)
-
-    count = cursor.fetchone()[0]
 
     formatter_list = []
     for i in range(0, len(stringified_event[1])):
@@ -194,16 +189,46 @@ def persist_event(event, stringified_event):
         coordinates = "POINT(%s %s)" % (event.get('venue_latitude'), event.get('venue_longitude'))
         stringified_event[1].append(coordinates)
 
+    select_check_sql = "SELECT updated_at FROM events where fid=%s"
+    select_check_values = [event.get('fid')]
+
+    cursor.execute(select_check_sql, select_check_values)
+    updated_at_row = cursor.fetchone()
+
+    if updated_at_row != None:
+        updated_at = updated_at_row[0]
+        updated_at_epoch = int(time.mktime(time.strptime(str(updated_at), "%Y-%m-%d")))
+        updated_time_epoch = epoch(event['updated_time'])
+
+        if updated_time_epoch > updated_at_epoch:
+            update_sql = "UPDATE events SET (" + stringified_event_0 + ") = (" + formatter_list_string + ") WHERE fid='" + event['fid'] + "'"
+            values = stringified_event[1]
+            cursor.execute(update_sql, values)
+            pg_connection.commit()
+
+    if event.get('venue_fid') == None:
+        sql = "SELECT fid FROM events WHERE name=%s AND venue_fid IS NULL AND start_time=%s ORDER BY updated_at DESC"
+        values = [event.get('name'), event.get('start_time')]
+    else:
+        sql = "SELECT fid FROM events WHERE name=%s AND venue_fid=%s AND start_time=%s ORDER BY updated_at DESC"
+        values = [event.get('name'), event.get('venue_fid'), event.get('start_time')]
+
+    cursor.execute(sql, values)
+    rows = cursor.fetchall()
+    count = len(rows)
+
     if count == 0:
         sql = "INSERT INTO events (" + stringified_event_0 + ") VALUES (" + formatter_list_string + ")"
         values = stringified_event[1]
         cursor.execute(sql, values)
-        pg_connection.commit()
-    else:
-        update_sql = "UPDATE events SET (" + stringified_event_0 + ") = (" + formatter_list_string + ") WHERE fid='" + event['fid'] + "'"
-        values = stringified_event[1]
-        cursor.execute(update_sql, values)
-        pg_connection.commit()
+    elif count > 1:
+        for x in range(1, count):
+            delete_sql = "DELETE FROM events where fid=%s"
+            deletable_fid = rows[x][0]
+            cursor.execute(delete_sql, deletable_fid)
+
+    pg_connection.commit()
+
 
 def stringify_schema(dictionary):
     stringified_value = []
@@ -226,9 +251,27 @@ def postgres_connection():
 
 access_token = get_access_token()
 pg_connection = postgres_connection()
+
+# cursor = pg_connection.cursor()
+#
+# select = "SELECT created_at from events where handle='nyrangers'"
+#
+# cursor.execute(select)
+#
+# x = cursor.fetchall()
+#
+# print(x)
+print("=======================================================================")
+print("=======================================================================")
 handle_list = get_handles_from_csv("facebook_pages.csv")
-handle_list = ['nyrangers']#, 'thegarden', 'terminal5nyc', 'websterhallnyc', 'brooklynbowl']
+# handle_list = ['nyrangers', 'thegarden']#, 'terminal5nyc', 'websterhallnyc', 'brooklynbowl']
+# handle_list = ['prucenter']
 for handle in handle_list:
+    print("CRAWLING FOR HANDLE: " + handle)
     crawl_from_to(handle)
+
+print("ALL PAGE EVENTS CRAWLED AT %s" % (str(datetime.now().replace(microsecond=0).isoformat())))
+print("=======================================================================")
+print("=======================================================================")
 
 pg_connection.close()
