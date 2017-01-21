@@ -25,6 +25,9 @@ DATABASE = "revmax_development"
 USER = "nandukalidindi"
 PASSWORD = "qwerty123"
 
+CRAWL_START_DATE = '2017-01-01T00:00:00-4000'
+CRAWL_END_DATE = '2018-01-01T00:00:00-4000'
+
 def get_handles_from_csv(filename):
     with open(filename) as file_csv:
         csv_reader = csv.reader(file_csv, delimiter=',', skipinitialspace=True)
@@ -88,8 +91,8 @@ def crawl_from_today():
     super_future_timestamp = epoch('3000-01-01T00:00:00-4000')
 
 def crawl_from_to(handle):
-    start_date = '2017-01-01T00:00:00-4000'
-    end_date = '2018-01-01T00:00:00-4000'
+    start_date = CRAWL_START_DATE
+    end_date = CRAWL_END_DATE
 
     epoch_start_date = epoch(start_date)
     epoch_end_date = epoch(end_date)
