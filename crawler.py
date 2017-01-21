@@ -255,20 +255,10 @@ def postgres_connection():
 access_token = get_access_token()
 pg_connection = postgres_connection()
 
-# cursor = pg_connection.cursor()
-#
-# select = "SELECT created_at from events where handle='nyrangers'"
-#
-# cursor.execute(select)
-#
-# x = cursor.fetchall()
-#
-# print(x)
 print("=======================================================================")
 print("=======================================================================")
 handle_list = get_handles_from_csv("facebook_pages.csv")
-# handle_list = ['nyrangers', 'thegarden']#, 'terminal5nyc', 'websterhallnyc', 'brooklynbowl']
-# handle_list = ['prucenter']
+
 for handle in handle_list:
     print("CRAWLING FOR HANDLE: " + handle)
     crawl_from_to(handle)
