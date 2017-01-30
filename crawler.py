@@ -15,11 +15,6 @@ APP_CLIENT_ID = "587748278082312"
 APP_CLIENT_SECRET = "653f038ce5648e38a231609066407d86"
 GRANT_TYPE = "client_credentials"
 
-# HOST = "ec2-54-172-214-110.compute-1.amazonaws.com"
-# DATABASE = "revmax_dev"
-# USER = "dev_master"
-# PASSWORD = "master01"
-
 HOST = "localhost"
 DATABASE = "revmax_development"
 USER = "nandukalidindi"
