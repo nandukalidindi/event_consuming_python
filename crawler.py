@@ -1,6 +1,6 @@
 import requests
 import psycopg2
-from datetime import datetime
+from datetime import datetime, timedelta
 import time
 import csv
 
@@ -131,6 +131,13 @@ def epoch(string_date):
     epoch = int(time.mktime(time.strptime(yyyyMMddTHHMMSS_date, pattern)))
     return epoch
 
+def addHourOffset(string_date, offset):
+    yyyyMMddTHHMMSS_date = string_date.rpartition("-")[0] if (len(string_date.rpartition("+")[0]) == 0) else string_date.rpartition("+")[0]
+    pattern = "%Y-%m-%dT%H:%M:%S"
+    offset_time = datetime.strptime(yyyyMMddTHHMMSS_date, pattern)
+    offset_time += timedelta(hours=offset)
+    return offset_time.strftime(pattern)
+
 def crawl_page_events(handle):
     url = "%s%s/events?access_token=%s%s" % (FACEBOOK_GRAPH_API, handle, access_token, ADDITIONAL_PARAMS)
     while url != None:
@@ -219,6 +226,27 @@ def persist_event(event, stringified_event):
         sql = "INSERT INTO events (" + stringified_event_0 + ") VALUES (" + formatter_list_string + ")"
         values = stringified_event[1]
         cursor.execute(sql, values)
+
+
+        if event.get('venue_latitude') != None and event.get('venue_longitude') != None:
+            # coordinates = "POINT(%s %s)" % (event.get('venue_latitude'), event.get('venue_longitude'))
+            # select_request_sql = "SELECT COUNT(*) from revmax_requests where location=ST_GeomFromText(%s, 4326)"
+            # cursor.execute(select_request_sql, [coordinates])
+            #
+            # count = cursor.fetchone()[0]
+            #
+            # if count > 10:
+            for i in range(0, event.get('venue_capacity')):
+                estimated_initiated_at = ""
+                if event.get('end_time') != None:
+                    estimated_initiated_at = event.get('end_time')
+                else:
+                    estimated_initiated_at = addHourOffset(event.get('start_time'), 2)
+
+                request_sql = "INSERT INTO revmax_requests (initiated_at, location) VALUES (%s, ST_GeomFromText(%s,4326))"
+
+                cursor.execute(request_sql, [estimated_initiated_at, coordinates])
+
     elif count > 1:
         for x in range(1, count):
             delete_sql = "DELETE FROM events where fid=%s"
