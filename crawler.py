@@ -180,7 +180,6 @@ def enrich_event(event_id, handle):
 
 def persist_event(event, stringified_event):
     stringified_event_0 = stringified_event[0][:-1]
-    cursor = pg_connection.cursor()
 
     formatter_list = []
     for i in range(0, len(stringified_event[1])):
@@ -191,7 +190,7 @@ def persist_event(event, stringified_event):
     if event.get('venue_latitude') != None and event.get('venue_longitude') != None:
         stringified_event_0 = stringified_event_0 + ",geometry"
         formatter_list_string = formatter_list_string + ",ST_GeomFromText(%s,4326)"
-        coordinates = "POINT(%s %s)" % (event.get('venue_latitude'), event.get('venue_longitude'))
+        coordinates = "POINT(%s %s)" % (event.get('venue_longitude'), event.get('venue_latitude'))
         stringified_event[1].append(coordinates)
 
     select_check_sql = "SELECT updated_at FROM events where fid=%s"
@@ -229,13 +228,6 @@ def persist_event(event, stringified_event):
 
 
         if event.get('venue_latitude') != None and event.get('venue_longitude') != None:
-            # coordinates = "POINT(%s %s)" % (event.get('venue_latitude'), event.get('venue_longitude'))
-            # select_request_sql = "SELECT COUNT(*) from revmax_requests where location=ST_GeomFromText(%s, 4326)"
-            # cursor.execute(select_request_sql, [coordinates])
-            #
-            # count = cursor.fetchone()[0]
-            #
-            # if count > 10:
             for i in range(0, event.get('venue_capacity')):
                 estimated_initiated_at = ""
                 if event.get('end_time') != None:
@@ -243,9 +235,8 @@ def persist_event(event, stringified_event):
                 else:
                     estimated_initiated_at = addHourOffset(event.get('start_time'), 2)
 
-                request_sql = "INSERT INTO revmax_requests (initiated_at, location) VALUES (%s, ST_GeomFromText(%s,4326))"
-
-                cursor.execute(request_sql, [estimated_initiated_at, coordinates])
+                request_sql = "INSERT INTO revmax_requests (initiated_at, location, source, location_text) VALUES (%s, ST_GeomFromText(%s,4326), %s, %s)"
+                cursor.execute(request_sql, [estimated_initiated_at, coordinates, "events", coordinates])
 
     elif count > 1:
         for x in range(1, count):
@@ -253,6 +244,11 @@ def persist_event(event, stringified_event):
             deletable_fid = rows[x][0]
             cursor.execute(delete_sql, deletable_fid)
 
+    pg_connection.commit()
+
+def delete_all_ride_requests():
+    delete_sql = "DELETE FROM revmax_requests"
+    cursor.execute(delete_sql)
     pg_connection.commit()
 
 
@@ -277,10 +273,13 @@ def postgres_connection():
 
 access_token = get_access_token()
 pg_connection = postgres_connection()
+cursor = pg_connection.cursor()
 
 print("=======================================================================")
 print("=======================================================================")
 handle_list = get_handles_from_csv("facebook_pages.csv")
+
+delete_all_ride_requests()
 
 for handle in handle_list:
     print("CRAWLING FOR HANDLE: " + handle)
