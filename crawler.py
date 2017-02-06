@@ -235,8 +235,15 @@ def persist_event(event, stringified_event):
                 else:
                     estimated_initiated_at = addHourOffset(event.get('start_time'), 2)
 
-                request_sql = "INSERT INTO revmax_requests (initiated_at, location, source, location_text) VALUES (%s, ST_GeomFromText(%s,4326), %s, %s)"
-                cursor.execute(request_sql, [estimated_initiated_at, coordinates, "events", coordinates])
+                select_random_sql = "SELECT dropoff_longitude, dropoff_latitude FROM yellow_cabs ORDER BY random() limit 1";
+                cursor.execute(select_random_sql)
+                randomly_picked_geometry = cursor.fetchone()
+
+                destination_coordinates = "POINT(%s %s)" % (str(randomly_picked_geometry[0]), str(randomly_picked_geometry[1]))
+                                
+                request_sql = "INSERT INTO revmax_requests (initiated_at, location, destination, source, location_text, destination_text) VALUES (%s, ST_GeomFromText(%s,4326), ST_GeomFromText(%s, 4326), %s, %s, %s)"
+                cursor.execute(request_sql, [estimated_initiated_at, coordinates, destination_coordinates, "events", coordinates, destination_coordinates])
+
 
     elif count > 1:
         for x in range(1, count):
