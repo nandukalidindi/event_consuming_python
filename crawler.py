@@ -226,30 +226,28 @@ def persist_event(event, stringified_event):
         values = stringified_event[1]
         cursor.execute(sql, values)
 
-
-        if event.get('venue_latitude') != None and event.get('venue_longitude') != None:
-            for i in range(0, event.get('venue_capacity')):
-                estimated_initiated_at = ""
-                if event.get('end_time') != None:
-                    estimated_initiated_at = event.get('end_time')
-                else:
-                    estimated_initiated_at = addHourOffset(event.get('start_time'), 2)
-
-                select_random_sql = "SELECT dropoff_longitude, dropoff_latitude FROM yellow_cabs ORDER BY random() limit 1";
-                cursor.execute(select_random_sql)
-                randomly_picked_geometry = cursor.fetchone()
-
-                destination_coordinates = "POINT(%s %s)" % (str(randomly_picked_geometry[0]), str(randomly_picked_geometry[1]))
-                                
-                request_sql = "INSERT INTO revmax_requests (initiated_at, location, destination, source, location_text, destination_text) VALUES (%s, ST_GeomFromText(%s,4326), ST_GeomFromText(%s, 4326), %s, %s, %s)"
-                cursor.execute(request_sql, [estimated_initiated_at, coordinates, destination_coordinates, "events", coordinates, destination_coordinates])
-
-
     elif count > 1:
         for x in range(1, count):
             delete_sql = "DELETE FROM events where fid=%s"
             deletable_fid = rows[x][0]
             cursor.execute(delete_sql, deletable_fid)
+            
+    if event.get('venue_latitude') != None and event.get('venue_longitude') != None:
+        for i in range(0, event.get('venue_capacity')):
+            estimated_initiated_at = ""
+            if event.get('end_time') != None:
+                estimated_initiated_at = event.get('end_time')
+            else:
+                estimated_initiated_at = addHourOffset(event.get('start_time'), 2)
+
+            select_random_sql = "SELECT dropoff_longitude, dropoff_latitude FROM yellow_cabs ORDER BY random() limit 1";
+            cursor.execute(select_random_sql)
+            randomly_picked_geometry = cursor.fetchone()
+
+            destination_coordinates = "POINT(%s %s)" % (str(randomly_picked_geometry[0]), str(randomly_picked_geometry[1]))
+
+            request_sql = "INSERT INTO revmax_requests (initiated_at, location, destination, source, location_text, destination_text) VALUES (%s, ST_GeomFromText(%s,4326), ST_GeomFromText(%s, 4326), %s, %s, %s)"
+            cursor.execute(request_sql, [estimated_initiated_at, coordinates, destination_coordinates, "events", coordinates, destination_coordinates])
 
     pg_connection.commit()
 
