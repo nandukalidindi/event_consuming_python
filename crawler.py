@@ -19,6 +19,7 @@ HOST = "localhost"
 DATABASE = "revmax_development"
 USER = "nandukalidindi"
 PASSWORD = "qwerty123"
+PORT=5432
 
 CRAWL_START_DATE = '2017-01-01T00:00:00-4000'
 CRAWL_END_DATE = '2018-01-01T00:00:00-4000'
@@ -62,7 +63,7 @@ def schema():
                 'venue_country'     : 'varchar',
                 'venue_latitude'    : 'varchar',
                 'venue_longitude'   : 'varchar',
-                'geometry'          : 'geometry',
+                # 'geometry'          : 'geometry',
                 'venue_capacity'    : 'integer'
             }
 
@@ -129,7 +130,7 @@ def epoch(string_date):
     yyyyMMddTHHMMSS_date = string_date.rpartition("-")[0] if (len(string_date.rpartition("+")[0]) == 0) else string_date.rpartition("+")[0]
     pattern = "%Y-%m-%dT%H:%M:%S"
     epoch = int(time.mktime(time.strptime(yyyyMMddTHHMMSS_date, pattern)))
-    return epoch
+    return epoch + 18000
 
 def addHourOffset(string_date, offset):
     yyyyMMddTHHMMSS_date = string_date.rpartition("-")[0] if (len(string_date.rpartition("+")[0]) == 0) else string_date.rpartition("+")[0]
@@ -154,7 +155,7 @@ def enrich_event(event_id, handle):
 
     response['fid'] = response['id']
     response['handle'] = handle
-    response['geometry'] = None
+    # response['geometry'] = None
     response['venue_capacity'] = None
     response['created_at'] = str(datetime.now().replace(microsecond=0).isoformat())
     response['updated_at'] = str(datetime.now().replace(microsecond=0).isoformat())
@@ -188,12 +189,12 @@ def persist_event(event, stringified_event):
     formatter_list_string = ','.join(formatter_list)
 
     if event.get('venue_latitude') != None and event.get('venue_longitude') != None:
-        stringified_event_0 = stringified_event_0 + ",geometry"
-        formatter_list_string = formatter_list_string + ",ST_GeomFromText(%s,4326)"
+        # stringified_event_0 = stringified_event_0 + ",geometry"
+        # formatter_list_string = formatter_list_string + ",ST_GeomFromText(%s,4326)"
         coordinates = "POINT(%s %s)" % (event.get('venue_longitude'), event.get('venue_latitude'))
-        stringified_event[1].append(coordinates)
+        # stringified_event[1].append(coordinates)
 
-    select_check_sql = "SELECT updated_at FROM events where fid=%s"
+    select_check_sql = "SELECT updated_at FROM revmax_event where fid=%s"
     select_check_values = [event.get('fid')]
 
     cursor.execute(select_check_sql, select_check_values)
@@ -205,16 +206,16 @@ def persist_event(event, stringified_event):
         updated_time_epoch = epoch(event['updated_time'])
 
         if updated_time_epoch > updated_at_epoch:
-            update_sql = "UPDATE events SET (" + stringified_event_0 + ") = (" + formatter_list_string + ") WHERE fid='" + event['fid'] + "'"
+            update_sql = "UPDATE revmax_event SET (" + stringified_event_0 + ") = (" + formatter_list_string + ") WHERE fid='" + event['fid'] + "'"
             values = stringified_event[1]
             cursor.execute(update_sql, values)
             pg_connection.commit()
 
     if event.get('venue_fid') == None:
-        sql = "SELECT fid FROM events WHERE name=%s AND venue_fid IS NULL AND start_time=%s ORDER BY updated_at DESC"
+        sql = "SELECT fid FROM revmax_event WHERE name=%s AND venue_fid IS NULL AND start_time=%s ORDER BY updated_at DESC"
         values = [event.get('name'), event.get('start_time')]
     else:
-        sql = "SELECT fid FROM events WHERE name=%s AND venue_fid=%s AND start_time=%s ORDER BY updated_at DESC"
+        sql = "SELECT fid FROM revmax_event WHERE name=%s AND venue_fid=%s AND start_time=%s ORDER BY updated_at DESC"
         values = [event.get('name'), event.get('venue_fid'), event.get('start_time')]
 
     cursor.execute(sql, values)
@@ -222,40 +223,39 @@ def persist_event(event, stringified_event):
     count = len(rows)
 
     if count == 0:
-        sql = "INSERT INTO events (" + stringified_event_0 + ") VALUES (" + formatter_list_string + ")"
+        sql = "INSERT INTO revmax_event (" + stringified_event_0 + ") VALUES (" + formatter_list_string + ")"
         values = stringified_event[1]
         cursor.execute(sql, values)
 
     elif count > 1:
         for x in range(1, count):
-            delete_sql = "DELETE FROM events where fid=%s"
+            delete_sql = "DELETE FROM revmax_event where fid=%s"
             deletable_fid = rows[x][0]
             cursor.execute(delete_sql, deletable_fid)
-            
-    if event.get('venue_latitude') != None and event.get('venue_longitude') != None:
-        for i in range(0, event.get('venue_capacity')):
-            estimated_initiated_at = ""
-            if event.get('end_time') != None:
-                estimated_initiated_at = event.get('end_time')
-            else:
-                estimated_initiated_at = addHourOffset(event.get('start_time'), 2)
 
-            select_random_sql = "SELECT dropoff_longitude, dropoff_latitude FROM yellow_cabs ORDER BY random() limit 1";
-            cursor.execute(select_random_sql)
-            randomly_picked_geometry = cursor.fetchone()
-
-            destination_coordinates = "POINT(%s %s)" % (str(randomly_picked_geometry[0]), str(randomly_picked_geometry[1]))
-
-            request_sql = "INSERT INTO revmax_requests (initiated_at, location, destination, source, location_text, destination_text) VALUES (%s, ST_GeomFromText(%s,4326), ST_GeomFromText(%s, 4326), %s, %s, %s)"
-            cursor.execute(request_sql, [estimated_initiated_at, coordinates, destination_coordinates, "events", coordinates, destination_coordinates])
+    # if event.get('venue_latitude') != None and event.get('venue_longitude') != None:
+    #     for i in range(0, event.get('venue_capacity')):
+    #         estimated_initiated_at = ""
+    #         if event.get('end_time') != None:
+    #             estimated_initiated_at = event.get('end_time')
+    #         else:
+    #             estimated_initiated_at = addHourOffset(event.get('start_time'), 2)
+    #
+    #         select_random_sql = "SELECT dropoff_longitude, dropoff_latitude FROM yellow_cabs ORDER BY random() limit 1";
+    #         cursor.execute(select_random_sql)
+    #         randomly_picked_geometry = cursor.fetchone()
+    #
+    #         destination_coordinates = "POINT(%s %s)" % (str(randomly_picked_geometry[0]), str(randomly_picked_geometry[1]))
+    #
+    #         request_sql = "INSERT INTO revmax_request (initiated_at, location, destination, source, location_text, destination_text) VALUES (%s, ST_GeomFromText(%s,4326), ST_GeomFromText(%s, 4326), %s, %s, %s)"
+    #         cursor.execute(request_sql, [estimated_initiated_at, coordinates, destination_coordinates, "events", coordinates, destination_coordinates])
 
     pg_connection.commit()
 
 def delete_all_ride_requests():
-    delete_sql = "DELETE FROM revmax_requests"
+    delete_sql = "DELETE FROM revmax_request"
     cursor.execute(delete_sql)
     pg_connection.commit()
-
 
 def stringify_schema(dictionary):
     stringified_value = []
@@ -269,17 +269,16 @@ def stringify_schema(dictionary):
 
 def postgres_connection():
     try:
-        connection = psycopg2.connect("dbname={} user={} host={} password={}".format(DATABASE, USER, HOST, PASSWORD))
+        connection = psycopg2.connect("dbname={} user={} host={} password={} port={}".format(DATABASE, USER, HOST, PASSWORD, PORT))
     except:
         print("Unable to connect database. Please try again!")
 
-    return connection;
+    return connection
 
 
 access_token = get_access_token()
 pg_connection = postgres_connection()
 cursor = pg_connection.cursor()
-
 print("=======================================================================")
 print("=======================================================================")
 handle_list = get_handles_from_csv("facebook_pages.csv")

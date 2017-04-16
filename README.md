@@ -1,2 +1,2 @@
 # event_consuming_python
-Minimalist Django application to crawl facebook page events periodically
+Python script to crawl facebook page events periodically
