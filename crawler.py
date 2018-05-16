@@ -21,7 +21,7 @@ USER = "nandukalidindi"
 PASSWORD = "qwerty123"
 PORT=5432
 
-CRAWL_START_DATE = '2017-01-01T00:00:00-4000'
+CRAWL_START_DATE = '2016-01-01T00:00:00-4000'
 CRAWL_END_DATE = '2018-01-01T00:00:00-4000'
 
 def get_handles_from_csv(filename):
@@ -33,6 +33,33 @@ def get_handles_from_csv(filename):
                 handle_list.append(row[1])
 
     return handle_list
+
+
+def get_event_ids_for_location(lat = "53.551086", lng = "9.993682"):
+    hamburg_event_list = []
+    url = "%s/search?access_token=%s&type=place&q=%s&center=%s,%s&limit=1000" % (FACEBOOK_GRAPH_API, access_token, "Hamburg", lat, lng)
+
+    while url != None:
+        print("CRAWLING URL " + url);
+        full_response = get_api_response(url)
+        paginated_response = full_response.get('data')
+        if paginated_response != None:
+            for event in paginated_response:
+                hamburg_event_list.append(event["id"])
+
+            if len(paginated_response) == 0:
+                url = None
+            elif full_response.get('paging') != None and (full_response.get('paging').get('next') != None):
+                url = full_response.get('paging').get('next')
+            else:
+                url = None
+
+        else:
+            url = None
+
+    print("%s event venues found near Hamburg" %(len(hamburg_event_list)))
+    return hamburg_event_list
+
 
 
 def schema():
@@ -63,7 +90,7 @@ def schema():
                 'venue_country'     : 'varchar',
                 'venue_latitude'    : 'varchar',
                 'venue_longitude'   : 'varchar',
-                # 'geometry'          : 'geometry',
+                'geometry'          : 'geometry',
                 'venue_capacity'    : 'integer'
             }
 
@@ -155,7 +182,7 @@ def enrich_event(event_id, handle):
 
     response['fid'] = response['id']
     response['handle'] = handle
-    # response['geometry'] = None
+    response['geometry'] = None
     response['venue_capacity'] = None
     response['created_at'] = str(datetime.now().replace(microsecond=0).isoformat())
     response['updated_at'] = str(datetime.now().replace(microsecond=0).isoformat())
@@ -189,12 +216,12 @@ def persist_event(event, stringified_event):
     formatter_list_string = ','.join(formatter_list)
 
     if event.get('venue_latitude') != None and event.get('venue_longitude') != None:
-        # stringified_event_0 = stringified_event_0 + ",geometry"
-        # formatter_list_string = formatter_list_string + ",ST_GeomFromText(%s,4326)"
+        stringified_event_0 = stringified_event_0 + ",geometry"
+        formatter_list_string = formatter_list_string + ",ST_GeomFromText(%s,4326)"
         coordinates = "POINT(%s %s)" % (event.get('venue_longitude'), event.get('venue_latitude'))
-        # stringified_event[1].append(coordinates)
+        stringified_event[1].append(coordinates)
 
-    select_check_sql = "SELECT updated_at FROM revmax_event where fid=%s"
+    select_check_sql = "SELECT updated_at FROM events where fid=%s"
     select_check_values = [event.get('fid')]
 
     cursor.execute(select_check_sql, select_check_values)
@@ -206,16 +233,16 @@ def persist_event(event, stringified_event):
         updated_time_epoch = epoch(event['updated_time'])
 
         if updated_time_epoch > updated_at_epoch:
-            update_sql = "UPDATE revmax_event SET (" + stringified_event_0 + ") = (" + formatter_list_string + ") WHERE fid='" + event['fid'] + "'"
+            update_sql = "UPDATE events SET (" + stringified_event_0 + ") = (" + formatter_list_string + ") WHERE fid='" + event['fid'] + "'"
             values = stringified_event[1]
             cursor.execute(update_sql, values)
             pg_connection.commit()
 
     if event.get('venue_fid') == None:
-        sql = "SELECT fid FROM revmax_event WHERE name=%s AND venue_fid IS NULL AND start_time=%s ORDER BY updated_at DESC"
+        sql = "SELECT fid FROM events WHERE name=%s AND venue_fid IS NULL AND start_time=%s ORDER BY updated_at DESC"
         values = [event.get('name'), event.get('start_time')]
     else:
-        sql = "SELECT fid FROM revmax_event WHERE name=%s AND venue_fid=%s AND start_time=%s ORDER BY updated_at DESC"
+        sql = "SELECT fid FROM events WHERE name=%s AND venue_fid=%s AND start_time=%s ORDER BY updated_at DESC"
         values = [event.get('name'), event.get('venue_fid'), event.get('start_time')]
 
     cursor.execute(sql, values)
@@ -223,13 +250,13 @@ def persist_event(event, stringified_event):
     count = len(rows)
 
     if count == 0:
-        sql = "INSERT INTO revmax_event (" + stringified_event_0 + ") VALUES (" + formatter_list_string + ")"
+        sql = "INSERT INTO events (" + stringified_event_0 + ") VALUES (" + formatter_list_string + ")"
         values = stringified_event[1]
         cursor.execute(sql, values)
 
     elif count > 1:
         for x in range(1, count):
-            delete_sql = "DELETE FROM revmax_event where fid=%s"
+            delete_sql = "DELETE FROM events where fid=%s"
             deletable_fid = rows[x][0]
             cursor.execute(delete_sql, deletable_fid)
 
@@ -281,16 +308,24 @@ pg_connection = postgres_connection()
 cursor = pg_connection.cursor()
 print("=======================================================================")
 print("=======================================================================")
-handle_list = get_handles_from_csv("facebook_pages.csv")
+# handle_list = get_handles_from_csv("facebook_pages.csv")
 
-delete_all_ride_requests()
+event_id_list = get_event_ids_for_location()
 
-for handle in handle_list:
-    print("CRAWLING FOR HANDLE: " + handle)
-    crawl_from_to(handle)
+for id in event_id_list:
+    crawl_from_to(id)
 
-print("ALL PAGE EVENTS CRAWLED AT %s" % (str(datetime.now().replace(microsecond=0).isoformat())))
-print("=======================================================================")
-print("=======================================================================")
+# delete_all_ride_requests()
+
+# for handle in handle_list:
+    # print("CRAWLING FOR HANDLE: " + handle)
+    # crawl_from_to(handle)
+
+# print("ALL PAGE EVENTS CRAWLED AT %s" % (str(datetime.now().replace(microsecond=0).isoformat())))
+# print("=======================================================================")
+# print("=======================================================================")
+
+# k = get_event_ids_for_location()
+# print(k)
 
 pg_connection.close()
